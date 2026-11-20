@@ -1,3 +1,10 @@
+lingmo-photos (1.0.13+lingmo5u1) unstable; urgency=medium
+
+  * Place home shortcuts beside the photo count in the bottom status row.
+  * Reduce header theme icon sizes so they stay inside their button plates.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sat, 21 Nov 2026 23:30:00 +0800
+
 lingmo-photos (1.0.12+lingmo5u1) unstable; urgency=medium
 
   * Align viewer back and edit controls before the Photos title and keep
