@@ -31,7 +31,8 @@ public:
         m_header = addChild<WindowHeader>(46);
         auto* headerContent = m_header->setContent<Row>();
         auto* sidebarGap = headerContent->addChild<View>(); sidebarGap->setLayoutHints({.preferredWidth = 220});
-        m_headerTitle = headerContent->addChild<Label>(tr("Photos")); m_headerTitle->setFontSize(17); m_headerTitle->setVerticallyCentered(true); m_headerTitle->setLayoutHints({.fillWidth = true});
+        m_headerTitle = headerContent->addChild<Label>(); m_headerTitle->setFontSize(17); m_headerTitle->setVerticallyCentered(true); m_headerTitle->setLayoutHints({.fillWidth = true});
+        m_header->setMinimizeVisible(true); m_header->setMaximizeVisible(true); m_header->setCloseVisible(true);
         m_search = addChild<SearchField>(); m_search->setPlaceholder(tr("Search photos")); m_search->onTextChanged = [this] { refresh(); };
         m_import = addChild<Button>(tr("Import")); m_import->onClicked = [this] { scanPictures(); };
         m_scroll = addChild<ScrollView>(); m_grid = m_scroll->setContent<Grid>(5); m_grid->setColumnSpacing(12); m_grid->setRowSpacing(12); m_grid->setMargins({28, 16, 28, 24});
@@ -40,9 +41,9 @@ public:
         m_page = "photos"; refresh();
     }
     void layout() override {
-        const double side = 220; m_header->setGeometry({0, 0, geometry().width, 46}); m_appTitle->setGeometry({20, 0, side - 40, 46}); m_sidebar->setGeometry({0, 46, side, std::max(0.0, geometry().height - 46)}); m_search->setGeometry({std::max(side + 320.0, geometry().width - 360), 5, 240, 36}); m_import->setGeometry({std::max(side + 570.0, geometry().width - 110), 5, 82, 36}); m_scroll->setGeometry({side, 46, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 82)}); m_status->setGeometry({side + 28, std::max(0.0, geometry().height - 30), 300, 24});
+        const double side = 220; m_header->setGeometry({0, 0, geometry().width, 46}); m_appTitle->setGeometry({20, 0, side - 40, 46}); m_sidebar->setGeometry({0, 46, side, std::max(0.0, geometry().height - 46)}); m_search->setGeometry({std::max(side + 320.0, geometry().width - 360), 56, 240, 36}); m_import->setGeometry({std::max(side + 570.0, geometry().width - 110), 56, 82, 36}); m_scroll->setGeometry({side, 102, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 138)}); m_status->setGeometry({side + 28, std::max(0.0, geometry().height - 30), 300, 24});
     }
-    void paint(Painter& painter) override { const auto& theme = Theme::current(); const bool glass = window() && window()->backgroundGlassAvailable(); if (!glass) painter.fillRect(localRect(), theme.background); painter.fillRect({0, 0, 220, geometry().height}, theme.secondBackground.withAlpha(glass ? .72 : 1)); painter.fillRect({220, 0, 1, geometry().height}, theme.text.withAlpha(.08)); }
+    void paint(Painter& painter) override { const auto& theme = Theme::current(); const bool glass = window() && window()->backgroundGlassAvailable(); painter.fillRect(localRect(), theme.background.withAlpha(glass ? .88 : 1)); painter.fillRect({0, 0, 220, geometry().height}, theme.secondBackground.withAlpha(glass ? .72 : 1)); painter.fillRect({220, 0, 1, geometry().height}, theme.text.withAlpha(.08)); }
 private:
     void refresh() {
         while (!m_grid->children().empty()) m_grid->takeChild(m_grid->children().front().get());
