@@ -43,7 +43,14 @@ public:
     void layout() override {
         const double side = 220; m_header->setGeometry({0, 0, geometry().width, 46}); m_appTitle->setGeometry({20, 0, side - 40, 46}); m_sidebar->setGeometry({0, 46, side, std::max(0.0, geometry().height - 46)}); m_search->setGeometry({std::max(side + 320.0, geometry().width - 360), 56, 240, 36}); m_import->setGeometry({std::max(side + 570.0, geometry().width - 110), 56, 82, 36}); m_scroll->setGeometry({side, 102, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 138)}); m_status->setGeometry({side + 28, std::max(0.0, geometry().height - 30), 300, 24});
     }
-    void paint(Painter& painter) override { const auto& theme = Theme::current(); const bool glass = window() && window()->backgroundGlassAvailable(); painter.fillRect(localRect(), theme.background.withAlpha(glass ? .88 : 1)); painter.fillRect({0, 0, 220, geometry().height}, theme.secondBackground.withAlpha(glass ? .72 : 1)); painter.fillRect({220, 0, 1, geometry().height}, theme.text.withAlpha(.08)); }
+    void paint(Painter& painter) override {
+        const auto& theme = Theme::current();
+        const bool glass = window() && window()->backgroundGlassAvailable();
+        const double side = 220;
+        painter.fillRect({side, 0, std::max(0.0, geometry().width - side), geometry().height}, theme.background);
+        painter.fillRect({0, 0, side, geometry().height}, theme.secondBackground.withAlpha(glass ? .72 : 1));
+        painter.fillRect({side, 0, 1, geometry().height}, theme.text.withAlpha(.08));
+    }
 private:
     void refresh() {
         while (!m_grid->children().empty()) m_grid->takeChild(m_grid->children().front().get());

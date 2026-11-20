@@ -1,3 +1,11 @@
+lingmo-photos (1.0.3+lingmo5u1) unstable; urgency=medium
+
+  * Keep the work area opaque while allowing the sidebar tint to reveal the
+    compositor's blurred glass material.
+  * Exercise the glass rendering path in the UI preview test.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sat, 21 Nov 2026 18:00:00 +0800
+
 lingmo-photos (1.0.2+lingmo5u1) unstable; urgency=medium
 
   * Keep toolbar controls below the native window header and avoid duplicate
