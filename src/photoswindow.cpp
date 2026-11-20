@@ -65,6 +65,14 @@ public:
         m_fullScreenButton = addChild<RoundImageButton>("view-fullscreen"); m_fullScreenButton->setToolTip(tr("Full Screen")); m_fullScreenButton->onClicked = [this] { m_fullScreen(!m_fullScreenState); m_fullScreenState = !m_fullScreenState; };
         m_slideButton = addChild<RoundImageButton>("media-playback-start"); m_slideButton->setToolTip(tr("Slideshow")); m_slideButton->onClicked = [this] { m_sliding = !m_sliding; m_slideShow(m_sliding); };
         m_restoreButton = addChild<RoundImageButton>("view-refresh"); m_restoreButton->setToolTip(tr("Restore")); m_restoreButton->onClicked = m_restore;
+        // Viewer actions live in the global menu. Keep only the navigation
+        // affordance in the content area so the image remains the focus.
+        m_prev->setVisible(false); m_nextButton->setVisible(false);
+        m_favoriteButton->setVisible(false); m_trashButton->setVisible(false);
+        m_zoomOut->setVisible(false); m_zoomIn->setVisible(false);
+        m_resetZoom->setVisible(false); m_flip->setVisible(false);
+        m_fullScreenButton->setVisible(false); m_slideButton->setVisible(false);
+        m_restoreButton->setVisible(false);
         m_image = addChild<ImageView>(); m_image->setFillMode(ImageView::FillMode::PreserveAspectFit); m_image->setAutoTransform(true);
         m_info = addChild<Label>(); m_info->setColor(ColorId::DisabledText); m_info->setWrap(true);
     }
@@ -73,7 +81,9 @@ public:
     }
     void zoomOut() { setZoom(m_zoom - .15); }
     void zoomIn() { setZoom(m_zoom + .15); }
+    void resetZoom() { setZoom(1); }
     void flip() { m_flipped = !m_flipped; updateTransform(); }
+    void toggleSlideShow() { m_sliding = !m_sliding; m_slideShow(m_sliding); }
 protected:
     void layout() override {
         m_back->setGeometry({24, 18, 80, 36}); m_prev->setGeometry({120, 18, 76, 36}); m_nextButton->setGeometry({200, 18, 76, 36}); m_zoomOut->setGeometry({300, 18, 82, 36}); m_zoomIn->setGeometry({388, 18, 82, 36}); m_resetZoom->setGeometry({476, 18, 72, 36}); m_flip->setGeometry({556, 18, 72, 36}); m_fullScreenButton->setGeometry({636, 18, 106, 36}); m_slideButton->setGeometry({750, 18, 110, 36}); m_restoreButton->setGeometry({geometry().width - 370, 18, 110, 36}); m_favoriteButton->setGeometry({geometry().width - 250, 18, 100, 36}); m_trashButton->setGeometry({geometry().width - 140, 18, 116, 36}); m_image->setGeometry({24, 72, std::max(0.0, geometry().width - 300), std::max(0.0, geometry().height - 110)}); m_info->setGeometry({geometry().width - 250, 80, 220, 180});
@@ -100,10 +110,10 @@ public:
         m_search = addChild<SearchField>(); m_search->setPlaceholder(tr("Search photos")); m_search->onTextChanged = [this] { refresh(); };
         m_import = addChild<Button>(tr("Import")); m_import->onClicked = [this] { scanPictures(); };
         m_quickBar = addChild<Row>(); m_quickBar->setSpacing(8);
-        auto* quickImport = m_quickBar->addChild<RoundImageButton>("document-import"); quickImport->setToolTip(tr("Import Photos")); quickImport->onClicked = [this] { scanPictures(); };
-        auto* quickRecent = m_quickBar->addChild<RoundImageButton>("document-open-recent"); quickRecent->setToolTip(tr("Recently Added")); quickRecent->onClicked = [this] { selectPage("recent"); };
-        auto* quickFavorite = m_quickBar->addChild<RoundImageButton>("starred"); quickFavorite->setToolTip(tr("Favorites")); quickFavorite->onClicked = [this] { selectPage("favorites"); };
-        auto* quickTrash = m_quickBar->addChild<RoundImageButton>("user-trash"); quickTrash->setToolTip(tr("Recently Deleted")); quickTrash->onClicked = [this] { selectPage("trash"); };
+        auto* quickImport = m_quickBar->addChild<RoundImageButton>("", 28); quickImport->setSource("document-import"); quickImport->setToolTip(tr("Import Photos")); quickImport->onClicked = [this] { scanPictures(); };
+        auto* quickRecent = m_quickBar->addChild<RoundImageButton>("", 28); quickRecent->setSource("document-open-recent"); quickRecent->setToolTip(tr("Recently Added")); quickRecent->onClicked = [this] { selectPage("recent"); };
+        auto* quickFavorite = m_quickBar->addChild<RoundImageButton>("", 28); quickFavorite->setSource("starred"); quickFavorite->setToolTip(tr("Favorites")); quickFavorite->onClicked = [this] { selectPage("favorites"); };
+        auto* quickTrash = m_quickBar->addChild<RoundImageButton>("", 28); quickTrash->setSource("user-trash"); quickTrash->setToolTip(tr("Recently Deleted")); quickTrash->onClicked = [this] { selectPage("trash"); };
         m_scroll = addChild<ScrollView>(); m_content = m_scroll->setContent<Column>(); m_content->setSpacing(20); m_content->setMargins({28, 16, 28, 24});
         m_status = addChild<Label>(); m_status->setColor(ColorId::DisabledText);
         m_viewer = addChild<Viewer>([this] { closeViewer(); }, [this] { moveViewer(-1); }, [this] { moveViewer(1); }, [this] { toggleViewerFavorite(); }, [this] { trashViewer(); }, [this](bool enabled) { m_owner.window().setFullScreen(enabled); }, [this](bool enabled) { setSlideShow(enabled); }, [this] { restoreViewer(); }); m_viewer->setVisible(false);
@@ -112,10 +122,10 @@ public:
     }
     void menuAction(int id) {
         if (!m_viewer->isVisible()) return;
-        switch (id) { case 7: moveViewer(-1); break; case 8: moveViewer(1); break; case 9: m_viewer->zoomOut(); break; case 10: m_viewer->zoomIn(); break; case 11: m_viewer->flip(); break; case 12: m_owner.window().setFullScreen(!m_owner.window().states().fullScreen); break; case 13: setSlideShow(true); break; case 14: restoreViewer(); break; default: break; }
+        switch (id) { case 7: closeViewer(); break; case 8: moveViewer(-1); break; case 9: moveViewer(1); break; case 10: m_viewer->zoomOut(); break; case 11: m_viewer->zoomIn(); break; case 12: m_viewer->resetZoom(); break; case 13: m_viewer->flip(); break; case 14: m_owner.window().setFullScreen(!m_owner.window().states().fullScreen); break; case 15: m_viewer->toggleSlideShow(); break; case 16: toggleViewerFavorite(); break; case 17: trashViewer(); break; case 18: restoreViewer(); break; default: break; }
     }
     void layout() override {
-        const double side = 220; m_header->setGeometry({0, 0, geometry().width, 46}); m_appTitle->setGeometry({20, 0, side - 40, 46}); m_sidebar->setGeometry({0, 46, side, std::max(0.0, geometry().height - 46)}); m_search->setGeometry({std::max(side + 320.0, geometry().width - 360), 56, 240, 36}); m_import->setGeometry({std::max(side + 570.0, geometry().width - 110), 56, 82, 36}); m_quickBar->setGeometry({side + 28, 102, 180, 36}); m_scroll->setVisible(!m_viewer->isVisible()); m_search->setVisible(!m_viewer->isVisible()); m_import->setVisible(!m_viewer->isVisible()); m_quickBar->setVisible(!m_viewer->isVisible()); m_status->setVisible(!m_viewer->isVisible()); m_scroll->setGeometry({side, 146, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 182)}); m_status->setGeometry({side + 28, std::max(0.0, geometry().height - 30), 300, 24}); m_viewer->setGeometry({side, 46, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 46)});
+        const double side = 220; const bool home = m_page == "photos"; const bool browsing = !m_viewer->isVisible(); m_header->setGeometry({0, 0, geometry().width, 46}); m_appTitle->setGeometry({20, 0, side - 40, 46}); m_sidebar->setGeometry({0, 46, side, std::max(0.0, geometry().height - 46)}); m_search->setGeometry({std::max(side + 320.0, geometry().width - 360), 56, 240, 36}); m_import->setGeometry({std::max(side + 570.0, geometry().width - 110), 56, 82, 36}); m_quickBar->setGeometry({side + 28, std::max(0.0, geometry().height - 66), 180, 28}); m_scroll->setVisible(browsing); m_search->setVisible(browsing); m_import->setVisible(browsing); m_quickBar->setVisible(browsing && home); m_status->setVisible(browsing); m_scroll->setGeometry({side, 102, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 148)}); m_status->setGeometry({side + 28, std::max(0.0, geometry().height - 30), 300, 24}); m_viewer->setGeometry({side, 46, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 46)});
     }
     void paint(Painter& painter) override {
         const auto& theme = Theme::current();

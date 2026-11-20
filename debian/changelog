@@ -1,3 +1,12 @@
+lingmo-photos (1.0.10+lingmo5u1) unstable; urgency=medium
+
+  * Move viewer actions to the global menu and keep only the back control
+    in the viewer.
+  * Add small home-page shortcuts above the status area and align the page
+    title and gallery content.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sat, 21 Nov 2026 22:00:00 +0800
+
 lingmo-photos (1.0.9+lingmo5u1) unstable; urgency=medium
 
   * Replace the viewer's text-button row with compact SDK icon controls.
