@@ -1,3 +1,11 @@
+lingmo-photos (1.0.8+lingmo5u1) unstable; urgency=medium
+
+  * Add SQLite album entities and membership operations.
+  * Add timeline date grouping, viewer zoom/flip/full-screen/slideshow
+    controls and Recently Deleted restore.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sat, 21 Nov 2026 21:00:00 +0800
+
 lingmo-photos (1.0.7+lingmo5u1) unstable; urgency=medium
 
   * Group the gallery into a real date-based timeline.

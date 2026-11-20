@@ -56,6 +56,8 @@ PhotoStore::PhotoStore(std::string path)
             "folder TEXT NOT NULL, captured TEXT NOT NULL, format TEXT NOT NULL, width INTEGER NOT NULL DEFAULT 0,"
             "height INTEGER NOT NULL DEFAULT 0, bytes INTEGER NOT NULL DEFAULT 0, favorite INTEGER NOT NULL DEFAULT 0,"
             "trashed INTEGER NOT NULL DEFAULT 0, indexed_at INTEGER NOT NULL DEFAULT (unixepoch()));"
+            "CREATE TABLE IF NOT EXISTS albums(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, favorite INTEGER NOT NULL DEFAULT 0);"
+            "CREATE TABLE IF NOT EXISTS album_photos(album_id INTEGER NOT NULL, photo_id INTEGER NOT NULL, PRIMARY KEY(album_id,photo_id), FOREIGN KEY(album_id) REFERENCES albums(id) ON DELETE CASCADE, FOREIGN KEY(photo_id) REFERENCES photos(id) ON DELETE CASCADE);"
             "CREATE INDEX IF NOT EXISTS photos_captured ON photos(captured);"
             "CREATE INDEX IF NOT EXISTS photos_folder ON photos(folder);");
 }
@@ -144,6 +146,21 @@ std::vector<Photo> PhotoStore::folder(const std::string& path) const {
     while (sqlite3_step(statement.value) == SQLITE_ROW)
         result.push_back({sqlite3_column_int64(statement.value, 0), text(statement.value, 1), text(statement.value, 2), text(statement.value, 3), text(statement.value, 4), text(statement.value, 5), sqlite3_column_int(statement.value, 6), sqlite3_column_int(statement.value, 7), sqlite3_column_int64(statement.value, 8), bool(sqlite3_column_int(statement.value, 9)), bool(sqlite3_column_int(statement.value, 10))});
     return result;
+}
+std::vector<Album> PhotoStore::albums() const {
+    std::vector<Album> result; Statement statement(m_private->db, "SELECT id,name,favorite FROM albums ORDER BY name");
+    while (sqlite3_step(statement.value) == SQLITE_ROW) result.push_back({sqlite3_column_int64(statement.value, 0), text(statement.value, 1), bool(sqlite3_column_int(statement.value, 2))});
+    return result;
+}
+int64_t PhotoStore::createAlbum(const std::string& name) {
+    Statement statement(m_private->db, "INSERT INTO albums(name) VALUES(?)"); sqlite3_bind_text(statement.value, 1, name.c_str(), -1, SQLITE_TRANSIENT); if (sqlite3_step(statement.value) != SQLITE_DONE) return 0; return sqlite3_last_insert_rowid(m_private->db);
+}
+void PhotoStore::renameAlbum(int64_t id, const std::string& name) { Statement statement(m_private->db, "UPDATE albums SET name=? WHERE id=?"); sqlite3_bind_text(statement.value, 1, name.c_str(), -1, SQLITE_TRANSIENT); sqlite3_bind_int64(statement.value, 2, id); sqlite3_step(statement.value); }
+void PhotoStore::deleteAlbum(int64_t id) { Statement statement(m_private->db, "DELETE FROM albums WHERE id=?"); sqlite3_bind_int64(statement.value, 1, id); sqlite3_step(statement.value); }
+void PhotoStore::addToAlbum(int64_t albumId, int64_t photoId) { Statement statement(m_private->db, "INSERT OR IGNORE INTO album_photos(album_id,photo_id) VALUES(?,?)"); sqlite3_bind_int64(statement.value, 1, albumId); sqlite3_bind_int64(statement.value, 2, photoId); sqlite3_step(statement.value); }
+std::vector<Photo> PhotoStore::albumPhotos(int64_t id) const {
+    std::vector<Photo> result; Statement statement(m_private->db, "SELECT p.id,p.path,p.name,p.folder,p.captured,p.format,p.width,p.height,p.bytes,p.favorite,p.trashed FROM photos p JOIN album_photos ap ON ap.photo_id=p.id WHERE ap.album_id=? AND p.trashed=0 ORDER BY p.captured DESC,p.name"); sqlite3_bind_int64(statement.value, 1, id);
+    while (sqlite3_step(statement.value) == SQLITE_ROW) result.push_back({sqlite3_column_int64(statement.value, 0), text(statement.value, 1), text(statement.value, 2), text(statement.value, 3), text(statement.value, 4), text(statement.value, 5), sqlite3_column_int(statement.value, 6), sqlite3_column_int(statement.value, 7), sqlite3_column_int64(statement.value, 8), bool(sqlite3_column_int(statement.value, 9)), bool(sqlite3_column_int(statement.value, 10))}); return result;
 }
 size_t PhotoStore::count(bool trash) const {
     Statement statement(m_private->db, trash ? "SELECT count(*) FROM photos WHERE trashed=1" : "SELECT count(*) FROM photos WHERE trashed=0");
