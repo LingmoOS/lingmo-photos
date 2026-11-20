@@ -22,6 +22,48 @@ namespace Photos {
 using namespace Lingmo::ui;
 using Lingmo::I18n::tr;
 namespace {
+class PhotoTile final : public View {
+public:
+    PhotoTile(Photo photo, std::function<void()> open)
+        : m_photo(std::move(photo)), m_open(std::move(open)) {
+        setTracksHover(true); setCursorShape(CursorShape::Pointer);
+        m_image = addChild<ImageView>(m_photo.path); m_image->setThumbnail(true); m_image->setAutoTransform(true); m_image->setFillMode(ImageView::FillMode::PreserveAspectCrop); m_image->setCornerRadius(10);
+        m_label = addChild<Label>(m_photo.name); m_label->setElide(Label::Elide::Middle);
+    }
+    SizeF sizeHint() const override { return {150, 140}; }
+    bool acceptsPointer() const override { return true; }
+protected:
+    void layout() override { m_image->setGeometry({0, 0, geometry().width, 112}); m_label->setGeometry({0, 116, geometry().width, 22}); }
+    void pointerRelease(const PointerEvent& event) override { if (event.button == MouseButton::Left && event.clickCount >= 2 && m_open) m_open(); }
+private:
+    Photo m_photo; std::function<void()> m_open; ImageView* m_image = nullptr; Label* m_label = nullptr;
+};
+
+class Viewer final : public View {
+public:
+    Viewer(std::function<void()> close, std::function<void()> previous, std::function<void()> next,
+           std::function<void()> favorite, std::function<void()> trash)
+        : m_close(std::move(close)), m_previous(std::move(previous)), m_next(std::move(next)), m_favorite(std::move(favorite)), m_trash(std::move(trash)) {
+        m_back = addChild<Button>(tr("Back")); m_back->onClicked = m_close;
+        m_prev = addChild<Button>(tr("Previous")); m_prev->onClicked = m_previous;
+        m_nextButton = addChild<Button>(tr("Next")); m_nextButton->onClicked = m_next;
+        m_favoriteButton = addChild<Button>(tr("Favorite")); m_favoriteButton->onClicked = m_favorite;
+        m_trashButton = addChild<Button>(tr("Move to Trash")); m_trashButton->onClicked = m_trash;
+        m_image = addChild<ImageView>(); m_image->setFillMode(ImageView::FillMode::PreserveAspectFit); m_image->setAutoTransform(true);
+        m_info = addChild<Label>(); m_info->setColor(ColorId::DisabledText); m_info->setWrap(true);
+    }
+    void setPhoto(const Photo& photo, size_t index, size_t count) {
+        m_image->setSource(photo.path); m_image->setSourceSize({geometry().width * .72, geometry().height * .72}); m_info->setText(photo.name + "\n" + photo.folder + "\n" + photo.format + "  " + std::to_string(photo.bytes) + " bytes"); m_prev->setEnabled(index > 0); m_nextButton->setEnabled(index + 1 < count); m_favoriteButton->setText(photo.favorite ? tr("Unfavorite") : tr("Favorite"));
+    }
+protected:
+    void layout() override {
+        m_back->setGeometry({24, 18, 80, 36}); m_prev->setGeometry({geometry().width / 2 - 170, 18, 76, 36}); m_nextButton->setGeometry({geometry().width / 2 + 94, 18, 76, 36}); m_favoriteButton->setGeometry({geometry().width - 250, 18, 100, 36}); m_trashButton->setGeometry({geometry().width - 140, 18, 116, 36}); m_image->setGeometry({24, 72, std::max(0.0, geometry().width - 300), std::max(0.0, geometry().height - 110)}); m_info->setGeometry({geometry().width - 250, 80, 220, 160});
+    }
+    void paint(Painter& painter) override { painter.fillRect(localRect(), Theme::current().background); }
+private:
+    std::function<void()> m_close, m_previous, m_next, m_favorite, m_trash; Button *m_back, *m_prev, *m_nextButton, *m_favoriteButton, *m_trashButton; ImageView* m_image; Label* m_info;
+};
+
 class Root final : public View {
 public:
     Root(PhotosWindow& owner, PhotoStore& store, LibraryScanner& scanner) : m_owner(owner), m_store(store), m_scanner(scanner) {
@@ -37,11 +79,12 @@ public:
         m_import = addChild<Button>(tr("Import")); m_import->onClicked = [this] { scanPictures(); };
         m_scroll = addChild<ScrollView>(); m_grid = m_scroll->setContent<Grid>(5); m_grid->setColumnSpacing(12); m_grid->setRowSpacing(12); m_grid->setMargins({28, 16, 28, 24});
         m_status = addChild<Label>(); m_status->setColor(ColorId::DisabledText);
+        m_viewer = addChild<Viewer>([this] { closeViewer(); }, [this] { moveViewer(-1); }, [this] { moveViewer(1); }, [this] { toggleViewerFavorite(); }, [this] { trashViewer(); }); m_viewer->setVisible(false);
         m_subscriptions.push_back(m_scanner.changed.connect([this] { refresh(); }));
         m_page = "photos"; refresh();
     }
     void layout() override {
-        const double side = 220; m_header->setGeometry({0, 0, geometry().width, 46}); m_appTitle->setGeometry({20, 0, side - 40, 46}); m_sidebar->setGeometry({0, 46, side, std::max(0.0, geometry().height - 46)}); m_search->setGeometry({std::max(side + 320.0, geometry().width - 360), 56, 240, 36}); m_import->setGeometry({std::max(side + 570.0, geometry().width - 110), 56, 82, 36}); m_scroll->setGeometry({side, 102, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 138)}); m_status->setGeometry({side + 28, std::max(0.0, geometry().height - 30), 300, 24});
+        const double side = 220; m_header->setGeometry({0, 0, geometry().width, 46}); m_appTitle->setGeometry({20, 0, side - 40, 46}); m_sidebar->setGeometry({0, 46, side, std::max(0.0, geometry().height - 46)}); m_search->setGeometry({std::max(side + 320.0, geometry().width - 360), 56, 240, 36}); m_import->setGeometry({std::max(side + 570.0, geometry().width - 110), 56, 82, 36}); m_scroll->setVisible(!m_viewer->isVisible()); m_search->setVisible(!m_viewer->isVisible()); m_import->setVisible(!m_viewer->isVisible()); m_status->setVisible(!m_viewer->isVisible()); m_scroll->setGeometry({side, 102, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 138)}); m_status->setGeometry({side + 28, std::max(0.0, geometry().height - 30), 300, 24}); m_viewer->setGeometry({side, 46, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 46)});
     }
     void paint(Painter& painter) override {
         const auto& theme = Theme::current();
@@ -55,11 +98,16 @@ private:
     void refresh() {
         while (!m_grid->children().empty()) m_grid->takeChild(m_grid->children().front().get());
         auto photos = m_search->text().empty() ? (m_page == "favorites" ? m_store.photos(true) : m_page == "trash" ? m_store.photos(false, true) : m_store.photos()) : m_store.search(m_search->text());
-        for (const auto& photo : photos) { auto* tile = m_grid->addChild<Column>(); tile->setSpacing(4); auto* image = tile->addChild<ImageView>(photo.path); image->setThumbnail(true); image->setAutoTransform(true); image->setFillMode(ImageView::FillMode::PreserveAspectCrop); image->setCornerRadius(10); image->setLayoutHints({.preferredWidth = 150, .preferredHeight = 112}); auto* name = tile->addChild<Label>(photo.name); name->setElide(Label::Elide::Middle); name->setLayoutHints({.fillWidth = true}); }
+        m_visible = photos; for (size_t index = 0; index < photos.size(); ++index) { auto photo = photos[index]; m_grid->addChild<PhotoTile>(photo, [this, index] { openViewer(index); }); }
         m_status->setText(std::to_string(photos.size()) + " " + tr("photos")); requestLayout(); requestPaint();
     }
     void scanPictures() { const char* home = std::getenv("HOME"); if (home) m_scanner.scan(std::string(home) + "/Pictures"); }
-    PhotosWindow& m_owner; PhotoStore& m_store; LibraryScanner& m_scanner; SidebarList* m_sidebar = nullptr; Label* m_appTitle = nullptr; WindowHeader* m_header = nullptr; Label* m_headerTitle = nullptr; SearchField* m_search = nullptr; Button* m_import = nullptr; ScrollView* m_scroll = nullptr; Grid* m_grid = nullptr; Label* m_status = nullptr; std::string m_page; std::vector<base::Subscription> m_subscriptions;
+    void openViewer(size_t index) { if (index >= m_visible.size()) return; m_viewerIndex = index; m_viewer->setPhoto(m_visible[index], index, m_visible.size()); m_viewer->setVisible(true); requestLayout(); }
+    void closeViewer() { m_viewer->setVisible(false); requestLayout(); }
+    void moveViewer(int delta) { const auto next = int(m_viewerIndex) + delta; if (next >= 0 && next < int(m_visible.size())) openViewer(size_t(next)); }
+    void toggleViewerFavorite() { if (m_viewerIndex < m_visible.size()) { m_store.setFavorite(m_visible[m_viewerIndex].id, !m_visible[m_viewerIndex].favorite); refresh(); openViewer(m_viewerIndex); } }
+    void trashViewer() { if (m_viewerIndex < m_visible.size()) { m_store.setTrashed(m_visible[m_viewerIndex].id, true); closeViewer(); refresh(); } }
+    PhotosWindow& m_owner; PhotoStore& m_store; LibraryScanner& m_scanner; SidebarList* m_sidebar = nullptr; Label* m_appTitle = nullptr; WindowHeader* m_header = nullptr; Label* m_headerTitle = nullptr; SearchField* m_search = nullptr; Button* m_import = nullptr; ScrollView* m_scroll = nullptr; Grid* m_grid = nullptr; Label* m_status = nullptr; Viewer* m_viewer = nullptr; std::vector<Photo> m_visible; size_t m_viewerIndex = 0; std::string m_page; std::vector<base::Subscription> m_subscriptions;
 };
 }
 PhotosWindow::PhotosWindow(std::string database) : m_store(std::move(database)), m_scanner(m_store) {

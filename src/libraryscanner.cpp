@@ -26,6 +26,7 @@ void LibraryScanner::scan(std::string root, std::function<void()> done) {
     auto cancelled = m_cancelled;
     auto loop = base::EventLoop::current()->handle();
     base::ThreadPool::global().post([this, root = std::move(root), done = std::move(done), cancelled, loop] {
+        std::vector<Photo> found;
         try {
             for (const auto& entry : std::filesystem::recursive_directory_iterator(root, std::filesystem::directory_options::skip_permission_denied)) {
                 if (cancelled->load()) return;
@@ -38,11 +39,13 @@ void LibraryScanner::scan(std::string root, std::function<void()> done) {
                 photo.bytes = static_cast<int64_t>(entry.file_size());
                 const auto stamp = entry.last_write_time().time_since_epoch().count();
                 photo.captured = std::to_string(stamp);
-                m_store.upsert(photo);
+                found.push_back(std::move(photo));
             }
         } catch (...) {
         }
-        loop.post([this, done = std::move(done)] {
+        loop.post([this, done = std::move(done), found = std::move(found)] {
+            for (const auto& photo : found)
+                m_store.upsert(photo);
             changed();
             if (done) done();
         });
