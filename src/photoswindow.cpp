@@ -5,6 +5,7 @@
 #include <base/paths.h>
 #include <base/i18n.h>
 #include <ui/about_dialog.h>
+#include <ui/animation.h>
 #include <ui/application.h>
 #include <ui/button.h>
 #include <ui/image_view.h>
@@ -34,7 +35,12 @@ public:
     bool acceptsPointer() const override { return true; }
 protected:
     void layout() override { m_image->setGeometry({0, 0, geometry().width, 112}); m_label->setGeometry({0, 116, geometry().width, 22}); }
-    void pointerRelease(const PointerEvent& event) override { if (event.button == MouseButton::Left && event.clickCount >= 2 && m_open) m_open(); }
+    void paint(Painter& painter) override {
+        const auto& theme = Theme::current();
+        const auto fill = isHovered() ? theme.text.withAlpha(theme.darkMode ? .12 : .07) : theme.text.withAlpha(theme.darkMode ? .07 : .035);
+        painter.drawSmoothRectangle(localRect(), theme.mediumRadius, fill);
+    }
+    void pointerRelease(const PointerEvent& event) override { if (event.button == MouseButton::Left && m_open) m_open(); }
 private:
     Photo m_photo; std::function<void()> m_open; ImageView* m_image = nullptr; Label* m_label = nullptr;
 };
@@ -102,12 +108,35 @@ private:
         m_status->setText(std::to_string(photos.size()) + " " + tr("photos")); requestLayout(); requestPaint();
     }
     void scanPictures() { const char* home = std::getenv("HOME"); if (home) m_scanner.scan(std::string(home) + "/Pictures"); }
-    void openViewer(size_t index) { if (index >= m_visible.size()) return; m_viewerIndex = index; m_viewer->setPhoto(m_visible[index], index, m_visible.size()); m_viewer->setVisible(true); requestLayout(); }
-    void closeViewer() { m_viewer->setVisible(false); requestLayout(); }
+    void openViewer(size_t index) {
+        if (index >= m_visible.size()) return;
+        m_viewerIndex = index;
+        m_viewer->setPhoto(m_visible[index], index, m_visible.size());
+        m_viewer->setVisible(true);
+        m_viewer->setOpacity(0);
+        m_viewer->setTransform({{}, .96});
+        requestLayout();
+        if (!window()) { m_viewer->setOpacity(1); m_viewer->setTransform({}); return; }
+        m_transition = std::make_unique<Animation>(window());
+        m_transition->setDuration(std::chrono::milliseconds(220));
+        m_transition->setEasing(Animation::Easing::OutCubic);
+        m_transition->onUpdate = [this](double value) { m_viewer->setOpacity(value); m_viewer->setTransform({{}, .96 + .04 * value}); };
+        m_transition->start();
+    }
+    void closeViewer() {
+        if (!m_viewer->isVisible()) return;
+        if (!window()) { m_viewer->setVisible(false); requestLayout(); return; }
+        m_transition = std::make_unique<Animation>(window());
+        m_transition->setDuration(std::chrono::milliseconds(180));
+        m_transition->setEasing(Animation::Easing::InOutCubic);
+        m_transition->onUpdate = [this](double value) { m_viewer->setOpacity(1 - value); m_viewer->setTransform({{}, 1 - .04 * value}); };
+        m_transition->onFinished = [this] { m_viewer->setVisible(false); m_viewer->setOpacity(1); m_viewer->setTransform({}); requestLayout(); };
+        m_transition->start();
+    }
     void moveViewer(int delta) { const auto next = int(m_viewerIndex) + delta; if (next >= 0 && next < int(m_visible.size())) openViewer(size_t(next)); }
     void toggleViewerFavorite() { if (m_viewerIndex < m_visible.size()) { m_store.setFavorite(m_visible[m_viewerIndex].id, !m_visible[m_viewerIndex].favorite); refresh(); openViewer(m_viewerIndex); } }
     void trashViewer() { if (m_viewerIndex < m_visible.size()) { if (m_page == "trash") m_store.purge(m_visible[m_viewerIndex].id); else m_store.setTrashed(m_visible[m_viewerIndex].id, true); closeViewer(); refresh(); } }
-    PhotosWindow& m_owner; PhotoStore& m_store; LibraryScanner& m_scanner; SidebarList* m_sidebar = nullptr; Label* m_appTitle = nullptr; WindowHeader* m_header = nullptr; Label* m_headerTitle = nullptr; SearchField* m_search = nullptr; Button* m_import = nullptr; ScrollView* m_scroll = nullptr; Grid* m_grid = nullptr; Label* m_status = nullptr; Viewer* m_viewer = nullptr; std::vector<Photo> m_visible; size_t m_viewerIndex = 0; std::string m_page; std::vector<base::Subscription> m_subscriptions;
+    PhotosWindow& m_owner; PhotoStore& m_store; LibraryScanner& m_scanner; SidebarList* m_sidebar = nullptr; Label* m_appTitle = nullptr; WindowHeader* m_header = nullptr; Label* m_headerTitle = nullptr; SearchField* m_search = nullptr; Button* m_import = nullptr; ScrollView* m_scroll = nullptr; Grid* m_grid = nullptr; Label* m_status = nullptr; Viewer* m_viewer = nullptr; std::unique_ptr<Animation> m_transition; std::vector<Photo> m_visible; size_t m_viewerIndex = 0; std::string m_page; std::vector<base::Subscription> m_subscriptions;
 };
 }
 PhotosWindow::PhotosWindow(std::string database) : m_store(std::move(database)), m_scanner(m_store) {
