@@ -1,3 +1,11 @@
+lingmo-photos (1.0.9+lingmo5u1) unstable; urgency=medium
+
+  * Replace the viewer's text-button row with compact SDK icon controls.
+  * Add viewer commands to the global menu and quick icon shortcuts below
+    the home toolbar.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sat, 21 Nov 2026 21:30:00 +0800
+
 lingmo-photos (1.0.8+lingmo5u1) unstable; urgency=medium
 
   * Add SQLite album entities and membership operations.

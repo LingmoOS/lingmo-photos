@@ -5,6 +5,7 @@
 #include "photostore.h"
 #include <memory>
 #include <string>
+#include <functional>
 namespace Lingmo::ui { class Window; class View; class AboutDialog; }
 namespace Photos {
 class GlobalMenu;
@@ -14,6 +15,7 @@ public:
     ~PhotosWindow();
     void show();
     void showAbout();
+    void setMenuAction(std::function<void(int)> action) { m_menuAction = std::move(action); }
     Lingmo::ui::Window& window();
 private:
     void refresh();
@@ -23,5 +25,6 @@ private:
     std::unique_ptr<Lingmo::ui::AboutDialog> m_about;
     std::unique_ptr<Lingmo::ui::Window> m_window;
     Lingmo::ui::View* m_root = nullptr;
+    std::function<void(int)> m_menuAction;
 };
 } // namespace Photos
