@@ -1,3 +1,11 @@
+lingmo-photos (1.0.15+lingmo5u1) unstable; urgency=medium
+
+  * Add a native viewer editing panel with brightness, contrast, saturation
+    and temperature controls.
+  * Add rotation, reset adjustments and non-destructive save-copy actions.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sun, 22 Nov 2026 00:30:00 +0800
+
 lingmo-photos (1.0.14+lingmo5u1) unstable; urgency=medium
 
   * Add a working album management page with create, open, rename and delete
