@@ -1,3 +1,11 @@
+lingmo-photos (1.0.14+lingmo5u1) unstable; urgency=medium
+
+  * Add a working album management page with create, open, rename and delete
+    operations backed by SQLite membership data.
+  * Add regression coverage for album membership persistence.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sat, 21 Nov 2026 23:59:00 +0800
+
 lingmo-photos (1.0.13+lingmo5u1) unstable; urgency=medium
 
   * Place home shortcuts beside the photo count in the bottom status row.

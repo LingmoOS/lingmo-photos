@@ -15,6 +15,7 @@
 #include <ui/search_field.h>
 #include <ui/scroll_view.h>
 #include <ui/round_image_button.h>
+#include <ui/text_field.h>
 #include <ui/sidebar.h>
 #include <ui/theme.h>
 #include <ui/window.h>
@@ -120,6 +121,8 @@ public:
         m_header->setMinimizeVisible(true); m_header->setMaximizeVisible(true); m_header->setCloseVisible(true);
         m_search = addChild<SearchField>(); m_search->setPlaceholder(tr("Search photos")); m_search->onTextChanged = [this] { refresh(); };
         m_import = addChild<Button>(tr("Import")); m_import->onClicked = [this] { scanPictures(); };
+        m_albumName = addChild<TextField>(); m_albumName->setPlaceholder(tr("New album name"));
+        m_createAlbum = addChild<Button>(tr("Create Album")); m_createAlbum->onClicked = [this] { createAlbum(); }; m_albumName->onAccepted = [this] { createAlbum(); }; m_albumName->setVisible(false); m_createAlbum->setVisible(false);
         m_quickBar = addChild<Row>(); m_quickBar->setSpacing(8);
         auto* quickImport = m_quickBar->addChild<RoundImageButton>("", 28); quickImport->setSource("document-import"); quickImport->setToolTip(tr("Import Photos")); quickImport->onClicked = [this] { scanPictures(); };
         auto* quickRecent = m_quickBar->addChild<RoundImageButton>("", 28); quickRecent->setSource("document-open-recent"); quickRecent->setToolTip(tr("Recently Added")); quickRecent->onClicked = [this] { selectPage("recent"); };
@@ -136,7 +139,7 @@ public:
         switch (id) { case 7: closeViewer(); break; case 8: moveViewer(-1); break; case 9: moveViewer(1); break; case 10: m_viewer->zoomOut(); break; case 11: m_viewer->zoomIn(); break; case 12: m_viewer->resetZoom(); break; case 13: m_viewer->flip(); break; case 14: m_owner.window().setFullScreen(!m_owner.window().states().fullScreen); break; case 15: m_viewer->toggleSlideShow(); break; case 16: toggleViewerFavorite(); break; case 17: trashViewer(); break; case 18: restoreViewer(); break; case 20: m_editing = !m_editing; m_viewer->setEditing(m_editing); if (m_editButton) m_editButton->setChecked(m_editing); break; default: break; }
     }
     void layout() override {
-        const double side = 220; const bool home = m_page == "photos"; const bool browsing = !m_viewer->isVisible(); m_header->setGeometry({0, 0, geometry().width, 46}); m_appTitle->setGeometry({20, 0, side - 40, 46}); m_sidebar->setGeometry({0, 46, side, std::max(0.0, geometry().height - 46)}); m_search->setGeometry({std::max(side + 320.0, geometry().width - 360), 56, 240, 36}); m_import->setGeometry({std::max(side + 570.0, geometry().width - 110), 56, 82, 36}); m_quickBar->setGeometry({side + 136, std::max(0.0, geometry().height - 34), 136, 28}); m_scroll->setVisible(browsing); m_search->setVisible(browsing); m_import->setVisible(browsing); m_quickBar->setVisible(browsing && home); m_status->setVisible(browsing); m_viewerBack->setVisible(!browsing); m_editButton->setVisible(!browsing); for (auto* action : {m_headerPrevious, m_headerNext, m_headerZoomOut, m_headerZoomIn, m_headerReset, m_headerFlip, m_headerFullScreen, m_headerSlideshow}) action->setVisible(!browsing); m_scroll->setGeometry({side, 102, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 148)}); m_status->setGeometry({side + 28, std::max(0.0, geometry().height - 30), 96, 24}); m_viewer->setGeometry({side, 46, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 46)});
+        const double side = 220; const bool home = m_page == "photos"; const bool albums = m_page == "albums"; const bool browsing = !m_viewer->isVisible(); m_header->setGeometry({0, 0, geometry().width, 46}); m_appTitle->setGeometry({20, 0, side - 40, 46}); m_sidebar->setGeometry({0, 46, side, std::max(0.0, geometry().height - 46)}); m_search->setGeometry({std::max(side + 320.0, geometry().width - 360), 56, 240, 36}); m_import->setGeometry({std::max(side + 570.0, geometry().width - 110), 56, 82, 36}); m_albumName->setGeometry({side + 28, 56, 240, 36}); m_createAlbum->setGeometry({side + 276, 56, 116, 36}); m_quickBar->setGeometry({side + 136, std::max(0.0, geometry().height - 34), 136, 28}); m_scroll->setVisible(browsing); m_search->setVisible(browsing && !albums); m_import->setVisible(browsing && !albums); m_albumName->setVisible(browsing && albums); m_createAlbum->setVisible(browsing && albums); m_quickBar->setVisible(browsing && home); m_status->setVisible(browsing); m_viewerBack->setVisible(!browsing); m_editButton->setVisible(!browsing); for (auto* action : {m_headerPrevious, m_headerNext, m_headerZoomOut, m_headerZoomIn, m_headerReset, m_headerFlip, m_headerFullScreen, m_headerSlideshow}) action->setVisible(!browsing); m_scroll->setGeometry({side, 102, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 148)}); m_status->setGeometry({side + 28, std::max(0.0, geometry().height - 30), 96, 24}); m_viewer->setGeometry({side, 46, std::max(0.0, geometry().width - side), std::max(0.0, geometry().height - 46)});
     }
     void paint(Painter& painter) override {
         const auto& theme = Theme::current();
@@ -149,13 +152,23 @@ public:
 private:
     void refresh() {
         while (!m_content->children().empty()) m_content->takeChild(m_content->children().front().get());
-        auto photos = m_search->text().empty() ? (m_page == "favorites" ? m_store.photos(true) : m_page == "trash" ? m_store.photos(false, true) : m_page == "folders" ? m_store.folder(std::getenv("HOME") ? std::string(std::getenv("HOME")) + "/Pictures" : std::string()) : m_store.photos()) : m_store.search(m_search->text());
+        const bool album = m_page.rfind("album:", 0) == 0;
+        auto photos = album ? m_store.albumPhotos(std::stoll(m_page.substr(6))) : m_search->text().empty() ? (m_page == "favorites" ? m_store.photos(true) : m_page == "trash" ? m_store.photos(false, true) : m_page == "folders" ? m_store.folder(std::getenv("HOME") ? std::string(std::getenv("HOME")) + "/Pictures" : std::string()) : m_store.photos()) : m_store.search(m_search->text());
         m_visible = photos;
+        if (m_page == "albums") {
+            for (const auto& item : m_store.albums()) {
+                auto* row = m_content->addChild<Row>(); row->setSpacing(8);
+                auto* name = row->addChild<TextField>(item.name); name->setLayoutHints({.fillWidth = true}); name->onAccepted = [this, id = item.id, name] { if (!name->text().empty()) { m_store.renameAlbum(id, name->text()); refresh(); } };
+                auto* open = row->addChild<Button>(tr("Open")); open->onClicked = [this, item] { m_page = "album:" + std::to_string(item.id); m_sidebar->setCurrent("albums"); m_headerTitle->setText(item.name); refresh(); };
+                auto* remove = row->addChild<Button>(tr("Delete")); remove->onClicked = [this, id = item.id] { m_store.deleteAlbum(id); refresh(); };
+            }
+        }
         std::map<std::string, Grid*> groups;
         for (size_t index = 0; index < photos.size(); ++index) { auto photo = photos[index]; const std::string key = photo.captured.empty() ? tr("Undated") : photo.captured; Grid* group = groups.count(key) ? groups[key] : nullptr; if (!group) { m_content->addChild<Label>(key)->setWeight(600); group = m_content->addChild<Grid>(5); group->setColumnSpacing(12); group->setRowSpacing(12); groups.emplace(key, group); } group->addChild<PhotoTile>(photo, [this, index] { openViewer(index); }); }
         m_status->setText(std::to_string(photos.size()) + " " + tr("photos")); requestLayout(); requestPaint();
     }
-    void selectPage(const std::string& id) { m_page = id; m_sidebar->setCurrent(id); m_headerTitle->setText(id == "recent" ? tr("Recently Added") : id == "favorites" ? tr("Favorites") : tr("Recently Deleted")); refresh(); }
+    void createAlbum() { const auto name = m_albumName->text(); if (name.empty()) return; if (m_store.createAlbum(name) != 0) { m_albumName->clear(); refresh(); } }
+    void selectPage(const std::string& id) { m_page = id; m_sidebar->setCurrent(id); m_headerTitle->setText(id == "recent" ? tr("Recently Added") : id == "favorites" ? tr("Favorites") : id == "albums" ? tr("Albums") : tr("Recently Deleted")); refresh(); }
     void scanPictures() { const char* home = std::getenv("HOME"); if (home) m_scanner.scan(std::string(home) + "/Pictures"); }
     void openViewer(size_t index) {
         if (index >= m_visible.size()) return;
@@ -187,7 +200,7 @@ private:
     void trashViewer() { if (m_viewerIndex < m_visible.size()) { if (m_page == "trash") m_store.purge(m_visible[m_viewerIndex].id); else m_store.setTrashed(m_visible[m_viewerIndex].id, true); closeViewer(); refresh(); } }
     void restoreViewer() { if (m_viewerIndex < m_visible.size()) { m_store.setTrashed(m_visible[m_viewerIndex].id, false); closeViewer(); refresh(); } }
     void setSlideShow(bool enabled) { if (enabled && window()) { m_slideTimer = Application::instance()->loop().startTimer(std::chrono::seconds(5), true, [this] { moveViewer(1); }); } else if (m_slideTimer) { Application::instance()->loop().stopTimer(m_slideTimer); m_slideTimer = 0; } }
-    PhotosWindow& m_owner; PhotoStore& m_store; LibraryScanner& m_scanner; SidebarList* m_sidebar = nullptr; Label* m_appTitle = nullptr; WindowHeader* m_header = nullptr; Label* m_headerTitle = nullptr; RoundImageButton* m_viewerBack = nullptr; RoundImageButton* m_editButton = nullptr; RoundImageButton *m_headerPrevious = nullptr, *m_headerNext = nullptr, *m_headerZoomOut = nullptr, *m_headerZoomIn = nullptr, *m_headerReset = nullptr, *m_headerFlip = nullptr, *m_headerFullScreen = nullptr, *m_headerSlideshow = nullptr; SearchField* m_search = nullptr; Button* m_import = nullptr; Row* m_quickBar = nullptr; ScrollView* m_scroll = nullptr; Column* m_content = nullptr; Label* m_status = nullptr; Viewer* m_viewer = nullptr; std::unique_ptr<Animation> m_transition; std::vector<Photo> m_visible; size_t m_viewerIndex = 0; int m_slideTimer = 0; std::string m_page; bool m_editing = false; std::vector<base::Subscription> m_subscriptions;
+    PhotosWindow& m_owner; PhotoStore& m_store; LibraryScanner& m_scanner; SidebarList* m_sidebar = nullptr; Label* m_appTitle = nullptr; WindowHeader* m_header = nullptr; Label* m_headerTitle = nullptr; RoundImageButton* m_viewerBack = nullptr; RoundImageButton* m_editButton = nullptr; RoundImageButton *m_headerPrevious = nullptr, *m_headerNext = nullptr, *m_headerZoomOut = nullptr, *m_headerZoomIn = nullptr, *m_headerReset = nullptr, *m_headerFlip = nullptr, *m_headerFullScreen = nullptr, *m_headerSlideshow = nullptr; SearchField* m_search = nullptr; Button* m_import = nullptr; TextField* m_albumName = nullptr; Button* m_createAlbum = nullptr; Row* m_quickBar = nullptr; ScrollView* m_scroll = nullptr; Column* m_content = nullptr; Label* m_status = nullptr; Viewer* m_viewer = nullptr; std::unique_ptr<Animation> m_transition; std::vector<Photo> m_visible; size_t m_viewerIndex = 0; int m_slideTimer = 0; std::string m_page; bool m_editing = false; std::vector<base::Subscription> m_subscriptions;
 };
 }
 PhotosWindow::PhotosWindow(std::string database) : m_store(std::move(database)), m_scanner(m_store) {
