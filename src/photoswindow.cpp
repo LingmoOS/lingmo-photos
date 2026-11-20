@@ -50,6 +50,47 @@ private:
     Photo m_photo; std::function<void()> m_open; ImageView* m_image = nullptr; Label* m_label = nullptr;
 };
 
+class EditPreviewOverlay final : public View {
+public:
+    void setAdjustments(double brightness, double contrast, double saturation, double temperature)
+    {
+        m_brightness = brightness;
+        m_contrast = contrast;
+        m_saturation = saturation;
+        m_temperature = temperature;
+        requestPaint();
+    }
+
+protected:
+    void paint(Painter& painter) override
+    {
+        if (m_brightness < 0)
+            painter.fillRect(localRect(), Color{0, 0, 0, static_cast<uint8_t>(-m_brightness * 120)});
+        else if (m_brightness > 0)
+            painter.fillRect(localRect(), Color{255, 255, 255, static_cast<uint8_t>(m_brightness * 100)});
+        if (m_temperature < 0)
+            painter.fillRect(localRect(), Color{35, 105, 220, static_cast<uint8_t>(-m_temperature * 70)});
+        else if (m_temperature > 0)
+            painter.fillRect(localRect(), Color{255, 145, 55, static_cast<uint8_t>(m_temperature * 70)});
+        if (m_contrast != 0) {
+            const auto alpha = static_cast<uint8_t>(std::abs(m_contrast) * 45);
+            painter.drawSmoothRectangle(localRect(), Theme::current().mediumRadius,
+                                        m_contrast > 0 ? Color{255, 255, 255, alpha} : Color{0, 0, 0, alpha});
+        }
+        if (m_saturation < 0)
+            painter.fillRect(localRect(), Color{128, 128, 128, static_cast<uint8_t>(-m_saturation * 35)});
+        else if (m_saturation > 0)
+            painter.drawSmoothRectangle(localRect(), Theme::current().mediumRadius,
+                                        Color{255, 40, 120, static_cast<uint8_t>(m_saturation * 25)});
+    }
+
+private:
+    double m_brightness = 0;
+    double m_contrast = 0;
+    double m_saturation = 0;
+    double m_temperature = 0;
+};
+
 class Viewer final : public View {
 public:
     Viewer(std::function<void()> close, std::function<void()> previous, std::function<void()> next,
@@ -78,6 +119,7 @@ public:
         m_fullScreenButton->setVisible(false); m_slideButton->setVisible(false);
         m_restoreButton->setVisible(false);
         m_image = addChild<ImageView>(); m_image->setFillMode(ImageView::FillMode::PreserveAspectFit); m_image->setAutoTransform(true);
+        m_previewOverlay = addChild<EditPreviewOverlay>(); m_previewOverlay->setVisible(false);
         m_info = addChild<Label>(); m_info->setColor(ColorId::DisabledText); m_info->setWrap(true);
         m_editor = addChild<Column>(); m_editor->setSpacing(8); m_editor->setMargins({16, 12, 16, 12});
         m_editorTitle = m_editor->addChild<Label>(tr("Edit Photo")); m_editorTitle->setWeight(600);
@@ -93,7 +135,7 @@ public:
     void setPhoto(const Photo& photo, size_t index, size_t count) {
         m_path = photo.path; m_photoInfo = photo.name + "\n" + photo.folder + "\n" + photo.captured + "\n" + photo.format + "  " + std::to_string(photo.bytes) + " bytes"; m_image->setSource(photo.path); m_image->setSourceSize({geometry().width * .72, geometry().height * .72}); m_info->setText(m_photoInfo); m_prev->setEnabled(index > 0); m_nextButton->setEnabled(index + 1 < count); m_favoriteButton->setToolTip(photo.favorite ? tr("Unfavorite") : tr("Favorite")); m_trashButton->setToolTip(photo.trashed ? tr("Delete Permanently") : tr("Move to Trash")); m_restoreButton->setVisible(photo.trashed); m_trashButton->setVisible(!photo.trashed); m_zoom = 1; m_flipped = false; m_editing = false; m_rotation = 0; m_brightness->setValue(0); m_contrast->setValue(0); m_saturation->setValue(0); m_temperature->setValue(0); updateTransform();
     }
-    void setEditing(bool editing) { m_editing = editing; m_editor->setVisible(editing); updateEditInfo(); requestLayout(); }
+    void setEditing(bool editing) { m_editing = editing; m_editor->setVisible(editing); m_previewOverlay->setVisible(editing); updateEditInfo(); requestLayout(); }
     void zoomOut() { setZoom(m_zoom - .15); }
     void zoomIn() { setZoom(m_zoom + .15); }
     void resetZoom() { setZoom(1); }
@@ -101,15 +143,15 @@ public:
     void toggleSlideShow() { m_sliding = !m_sliding; m_slideShow(m_sliding); }
 protected:
     void layout() override {
-        const double panel = m_editing ? 300 : 0; m_back->setGeometry({24, 18, 80, 36}); m_prev->setGeometry({120, 18, 76, 36}); m_nextButton->setGeometry({200, 18, 76, 36}); m_zoomOut->setGeometry({300, 18, 82, 36}); m_zoomIn->setGeometry({388, 18, 82, 36}); m_resetZoom->setGeometry({476, 18, 72, 36}); m_flip->setGeometry({556, 18, 72, 36}); m_fullScreenButton->setGeometry({636, 18, 106, 36}); m_slideButton->setGeometry({750, 18, 110, 36}); m_restoreButton->setGeometry({geometry().width - 370, 18, 110, 36}); m_favoriteButton->setGeometry({geometry().width - 250, 18, 100, 36}); m_trashButton->setGeometry({geometry().width - 140, 18, 116, 36}); m_image->setGeometry({24, 72, std::max(0.0, geometry().width - 300 - panel), std::max(0.0, geometry().height - 110)}); m_info->setGeometry({geometry().width - 250 - panel, 80, 220, 180}); m_editor->setGeometry({geometry().width - panel, 72, panel, std::max(0.0, geometry().height - 96)});
+        const double panel = m_editing ? 300 : 0; const RectF imageRect{24, 72, std::max(0.0, geometry().width - 300 - panel), std::max(0.0, geometry().height - 110)}; m_back->setGeometry({24, 18, 80, 36}); m_prev->setGeometry({120, 18, 76, 36}); m_nextButton->setGeometry({200, 18, 76, 36}); m_zoomOut->setGeometry({300, 18, 82, 36}); m_zoomIn->setGeometry({388, 18, 82, 36}); m_resetZoom->setGeometry({476, 18, 72, 36}); m_flip->setGeometry({556, 18, 72, 36}); m_fullScreenButton->setGeometry({636, 18, 106, 36}); m_slideButton->setGeometry({750, 18, 110, 36}); m_restoreButton->setGeometry({geometry().width - 370, 18, 110, 36}); m_favoriteButton->setGeometry({geometry().width - 250, 18, 100, 36}); m_trashButton->setGeometry({geometry().width - 140, 18, 116, 36}); m_image->setGeometry(imageRect); m_previewOverlay->setGeometry(imageRect); m_info->setGeometry({geometry().width - 250 - panel, 80, 220, 180}); m_editor->setGeometry({geometry().width - panel, 60, panel, std::max(0.0, geometry().height - 80)});
     }
-    void paint(Painter& painter) override { painter.fillRect(localRect(), Theme::current().background); }
+    void paint(Painter& painter) override { painter.fillRect(localRect(), Theme::current().background); if (m_editing) painter.drawSmoothRectangle({geometry().width - 316, 52, 304, std::max(0.0, geometry().height - 64)}, Theme::current().hugeRadius, Theme::current().secondBackground); }
 private:
-    Slider* addSlider(const std::string& title, double from, double to, double value) { auto* label = m_editor->addChild<Label>(title); auto* slider = m_editor->addChild<Slider>(); slider->setRange(from, to); slider->setValue(value); slider->setValueToolTip([title](double v) { return title + ": " + std::to_string(v); }); slider->onMoved = [this](double) { updateEditInfo(); }; return slider; }
-    void updateEditInfo() { if (!m_editing) { m_info->setText(m_photoInfo); return; } m_info->setText(std::string(tr("Edit mode")) + "\n" + tr("Adjustments are applied to a saved copy.") + "\n" + tr("Rotation") + ": " + std::to_string(m_rotation * 90) + "°\n" + tr("Brightness") + ": " + std::to_string(m_brightness->value()) + "\n" + tr("Contrast") + ": " + std::to_string(m_contrast->value()) + "\n" + tr("Saturation") + ": " + std::to_string(m_saturation->value()) + "\n" + tr("Temperature") + ": " + std::to_string(m_temperature->value()) + "\n\n" + m_photoInfo); }
+    Slider* addSlider(const std::string& title, double from, double to, double value) { auto* label = m_editor->addChild<Label>(title); label->setColor(ColorId::DisabledText); auto* slider = m_editor->addChild<Slider>(); slider->setRange(from, to); slider->setValue(value); slider->setValueToolTip([title](double v) { return title + ": " + std::to_string(v); }); slider->onMoved = [this](double) { updateEditInfo(); }; return slider; }
+    void updateEditInfo() { m_previewOverlay->setAdjustments(m_brightness->value(), m_contrast->value(), m_saturation->value(), m_temperature->value()); if (!m_editing) { m_info->setText(m_photoInfo); return; } m_info->setText(std::string(tr("Edit mode")) + "\n" + tr("Preview updates as you adjust the controls.") + "\n" + tr("Rotation") + ": " + std::to_string(m_rotation * 90) + "°\n" + tr("Brightness") + ": " + std::to_string(m_brightness->value()) + "\n" + tr("Contrast") + ": " + std::to_string(m_contrast->value()) + "\n" + tr("Saturation") + ": " + std::to_string(m_saturation->value()) + "\n" + tr("Temperature") + ": " + std::to_string(m_temperature->value()) + "\n\n" + m_photoInfo); }
     void setZoom(double value) { m_zoom = std::clamp(value, .5, 3.0); updateTransform(); }
     void updateTransform() { if (m_image) m_image->setTransform({{}, (m_flipped ? -1 : 1) * m_zoom}); }
-    std::function<void()> m_close, m_previous, m_next, m_favorite, m_trash, m_restore; std::function<void(bool)> m_fullScreen, m_slideShow; std::function<void(const std::string&)> m_exportCopy; RoundImageButton *m_back, *m_prev, *m_nextButton, *m_favoriteButton, *m_trashButton, *m_zoomOut, *m_zoomIn, *m_resetZoom, *m_flip, *m_fullScreenButton, *m_slideButton, *m_restoreButton; ImageView* m_image; Label* m_info; Column* m_editor; Label* m_editorTitle; Slider *m_brightness, *m_contrast, *m_saturation, *m_temperature; std::string m_photoInfo, m_path; int m_rotation = 0; double m_zoom = 1; bool m_flipped = false, m_fullScreenState = false, m_sliding = false, m_editing = false;
+    std::function<void()> m_close, m_previous, m_next, m_favorite, m_trash, m_restore; std::function<void(bool)> m_fullScreen, m_slideShow; std::function<void(const std::string&)> m_exportCopy; RoundImageButton *m_back, *m_prev, *m_nextButton, *m_favoriteButton, *m_trashButton, *m_zoomOut, *m_zoomIn, *m_resetZoom, *m_flip, *m_fullScreenButton, *m_slideButton, *m_restoreButton; ImageView* m_image; EditPreviewOverlay* m_previewOverlay; Label* m_info; Column* m_editor; Label* m_editorTitle; Slider *m_brightness, *m_contrast, *m_saturation, *m_temperature; std::string m_photoInfo, m_path; int m_rotation = 0; double m_zoom = 1; bool m_flipped = false, m_fullScreenState = false, m_sliding = false, m_editing = false;
 };
 
 class Root final : public View {
