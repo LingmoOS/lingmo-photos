@@ -34,6 +34,8 @@ public:
     std::vector<Photo> search(const std::string& query) const;
     void setFavorite(int64_t id, bool favorite);
     void setTrashed(int64_t id, bool trashed);
+    void purge(int64_t id);
+    std::vector<Photo> folder(const std::string& path) const;
     size_t count(bool trash = false) const;
 
 private:

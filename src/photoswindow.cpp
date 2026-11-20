@@ -53,7 +53,7 @@ public:
         m_info = addChild<Label>(); m_info->setColor(ColorId::DisabledText); m_info->setWrap(true);
     }
     void setPhoto(const Photo& photo, size_t index, size_t count) {
-        m_image->setSource(photo.path); m_image->setSourceSize({geometry().width * .72, geometry().height * .72}); m_info->setText(photo.name + "\n" + photo.folder + "\n" + photo.format + "  " + std::to_string(photo.bytes) + " bytes"); m_prev->setEnabled(index > 0); m_nextButton->setEnabled(index + 1 < count); m_favoriteButton->setText(photo.favorite ? tr("Unfavorite") : tr("Favorite"));
+        m_image->setSource(photo.path); m_image->setSourceSize({geometry().width * .72, geometry().height * .72}); m_info->setText(photo.name + "\n" + photo.folder + "\n" + photo.format + "  " + std::to_string(photo.bytes) + " bytes"); m_prev->setEnabled(index > 0); m_nextButton->setEnabled(index + 1 < count); m_favoriteButton->setText(photo.favorite ? tr("Unfavorite") : tr("Favorite")); m_trashButton->setText(photo.trashed ? tr("Delete Permanently") : tr("Move to Trash"));
     }
 protected:
     void layout() override {
@@ -97,7 +97,7 @@ public:
 private:
     void refresh() {
         while (!m_grid->children().empty()) m_grid->takeChild(m_grid->children().front().get());
-        auto photos = m_search->text().empty() ? (m_page == "favorites" ? m_store.photos(true) : m_page == "trash" ? m_store.photos(false, true) : m_store.photos()) : m_store.search(m_search->text());
+        auto photos = m_search->text().empty() ? (m_page == "favorites" ? m_store.photos(true) : m_page == "trash" ? m_store.photos(false, true) : m_page == "folders" ? m_store.folder(std::getenv("HOME") ? std::string(std::getenv("HOME")) + "/Pictures" : std::string()) : m_store.photos()) : m_store.search(m_search->text());
         m_visible = photos; for (size_t index = 0; index < photos.size(); ++index) { auto photo = photos[index]; m_grid->addChild<PhotoTile>(photo, [this, index] { openViewer(index); }); }
         m_status->setText(std::to_string(photos.size()) + " " + tr("photos")); requestLayout(); requestPaint();
     }
@@ -106,7 +106,7 @@ private:
     void closeViewer() { m_viewer->setVisible(false); requestLayout(); }
     void moveViewer(int delta) { const auto next = int(m_viewerIndex) + delta; if (next >= 0 && next < int(m_visible.size())) openViewer(size_t(next)); }
     void toggleViewerFavorite() { if (m_viewerIndex < m_visible.size()) { m_store.setFavorite(m_visible[m_viewerIndex].id, !m_visible[m_viewerIndex].favorite); refresh(); openViewer(m_viewerIndex); } }
-    void trashViewer() { if (m_viewerIndex < m_visible.size()) { m_store.setTrashed(m_visible[m_viewerIndex].id, true); closeViewer(); refresh(); } }
+    void trashViewer() { if (m_viewerIndex < m_visible.size()) { if (m_page == "trash") m_store.purge(m_visible[m_viewerIndex].id); else m_store.setTrashed(m_visible[m_viewerIndex].id, true); closeViewer(); refresh(); } }
     PhotosWindow& m_owner; PhotoStore& m_store; LibraryScanner& m_scanner; SidebarList* m_sidebar = nullptr; Label* m_appTitle = nullptr; WindowHeader* m_header = nullptr; Label* m_headerTitle = nullptr; SearchField* m_search = nullptr; Button* m_import = nullptr; ScrollView* m_scroll = nullptr; Grid* m_grid = nullptr; Label* m_status = nullptr; Viewer* m_viewer = nullptr; std::vector<Photo> m_visible; size_t m_viewerIndex = 0; std::string m_page; std::vector<base::Subscription> m_subscriptions;
 };
 }
