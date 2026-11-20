@@ -1,3 +1,11 @@
+lingmo-photos (1.0.18+lingmo5u1) unstable; urgency=medium
+
+  * Index image dimensions during background scanning for aspect-correct
+    editing previews.
+  * Avoid drawing edit overlays when dimensions are unavailable.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sun, 22 Nov 2026 02:00:00 +0800
+
 lingmo-photos (1.0.17+lingmo5u1) unstable; urgency=medium
 
   * Keep live edit overlays constrained to the source image aspect ratio so
