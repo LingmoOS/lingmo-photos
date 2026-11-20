@@ -16,6 +16,7 @@ public:
     void show();
     void showAbout();
     void setMenuAction(std::function<void(int)> action) { m_menuAction = std::move(action); }
+    void setViewerActive(bool active);
     Lingmo::ui::Window& window();
 private:
     void refresh();

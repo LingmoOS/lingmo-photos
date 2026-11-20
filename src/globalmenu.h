@@ -11,6 +11,7 @@ class GlobalMenu {
 public:
     explicit GlobalMenu(Lingmo::base::dbus::Connection*, std::function<void(int32_t)> activate);
     ~GlobalMenu();
+    void setViewerActive(bool active);
     Lingmo::base::Signal<bool> availabilityChanged;
 private:
     void registerMenu();
@@ -19,8 +20,10 @@ private:
     Lingmo::base::dbus::Object m_object;
     Lingmo::base::dbus::NameWatch m_watch;
     Lingmo::base::dbus::PendingCall m_registration;
+    uint32_t m_revision = 1;
     uint64_t m_generation = 0;
     bool m_available = false;
+    bool m_viewerActive = false;
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
 };
 } // namespace Photos

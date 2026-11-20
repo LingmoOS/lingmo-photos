@@ -1,3 +1,11 @@
+lingmo-photos (1.0.11+lingmo5u1) unstable; urgency=medium
+
+  * Move viewer back and edit actions into the native window header.
+  * Complete the Photos global menu export with edit actions and standard
+    D-Bus menu properties and refresh signals.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sat, 21 Nov 2026 22:30:00 +0800
+
 lingmo-photos (1.0.10+lingmo5u1) unstable; urgency=medium
 
   * Move viewer actions to the global menu and keep only the back control
