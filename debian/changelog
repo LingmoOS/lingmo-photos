@@ -1,3 +1,10 @@
+lingmo-photos (1.0.7+lingmo5u1) unstable; urgency=medium
+
+  * Group the gallery into a real date-based timeline.
+  * Add viewer zoom, flip, full-screen and slideshow controls.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sat, 21 Nov 2026 20:30:00 +0800
+
 lingmo-photos (1.0.6+lingmo5u1) unstable; urgency=medium
 
   * Open photo tiles on a single click.
