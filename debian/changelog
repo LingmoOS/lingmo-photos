@@ -1,3 +1,10 @@
+lingmo-photos (1.0.12+lingmo5u1) unstable; urgency=medium
+
+  * Align viewer back and edit controls before the Photos title and keep
+    viewer actions on the same native header row.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sat, 21 Nov 2026 23:00:00 +0800
+
 lingmo-photos (1.0.11+lingmo5u1) unstable; urgency=medium
 
   * Move viewer back and edit actions into the native window header.
