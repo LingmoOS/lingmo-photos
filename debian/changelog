@@ -1,3 +1,12 @@
+lingmo-photos (1.0.19+lingmo5u1) unstable; urgency=medium
+
+  * Add a real non-destructive edit export pipeline using GDK-Pixbuf.
+  * Apply brightness, contrast, saturation, temperature and 90-degree
+    rotation when saving an edited PNG copy.
+  * Add an image edit read/write regression test.
+
+ -- Lingmo OS Team <team@lingmo.org>  Sun, 22 Nov 2026 02:30:00 +0800
+
 lingmo-photos (1.0.18+lingmo5u1) unstable; urgency=medium
 
   * Index image dimensions during background scanning for aspect-correct
